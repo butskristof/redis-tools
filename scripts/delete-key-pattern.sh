@@ -1,5 +1,30 @@
 #!/bin/bash
 
+# Description:
+#   This script connects to a Redis store and deletes all keys matching a specified pattern.
+#   It supports both standalone instances and clusters.
+#
+# Usage:
+#   ./delete-key-pattern.sh [-h host] [-p port] [-a password] <key-pattern>
+#
+# Options:
+#   -h host      Redis host (default: localhost)
+#   -p port      Redis port (default: 6379)
+#   -a password  Redis password (optional)
+#
+# Arguments:
+#   key-pattern  A pattern for the keys to be deleted.
+#
+# Example:
+#   ./delete-key-pattern.sh -h redis.example.com -p 6380 -a mypassword 'user:*'
+#
+# Notes:
+#   - The script uses SCAN to iterate through keys in standalone mode.
+#   - In cluster mode, it identifies master nodes and deletes keys from each node.
+#
+# Dependencies:
+#   - redis-cli must be installed and available in the system PATH.
+
 # Function to display usage information
 usage() {
     echo "Usage: $0 [-h host] [-p port] [-a password] <key-pattern>"

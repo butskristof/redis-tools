@@ -1,5 +1,30 @@
 #!/bin/bash
 
+# Description:
+#   This script connects to a Redis instance and creates a specified number of key-value pairs.
+#   The keys are generated based on a user-provided pattern, and the values are random JSON objects.
+#
+# Usage:
+#   ./create-values.sh [-h host] [-p port] [-a password] [-n count] <key-pattern>
+#
+# Options:
+#   -h host      Redis host (default: localhost)
+#   -p port      Redis port (default: 6379)
+#   -a password  Redis password (optional)
+#   -n count     Number of items to create (default: 10000)
+#
+# Arguments:
+#   key-pattern  A pattern for the keys to be created. Use {num} in the pattern to insert a sequence number.
+#
+# Example:
+#   ./create-values.sh -h redis.example.com -p 6380 -a mypassword -n 5000 'user:{num}'
+#
+# Notes:
+#   - The script supports both standalone and cluster Redis modes.
+#
+# Dependencies:
+#   - redis-cli must be installed and available in the system PATH.
+
 # Function to display usage information
 usage() {
     echo "Usage: $0 [-h host] [-p port] [-a password] [-n count] <key-pattern>"
