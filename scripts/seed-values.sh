@@ -5,13 +5,14 @@
 #   The keys are generated based on a user-provided pattern, and the values are random JSON objects.
 #
 # Usage:
-#   ./create-values.sh [-h host] [-p port] [-a password] [-n count] <key-pattern>
+#   ./create-values.sh [-h host] [-p port] [-a password] [-n count] [-b batch_size] <key-pattern>
 #
 # Options:
-#   -h host      Redis host (default: localhost)
-#   -p port      Redis port (default: 6379)
-#   -a password  Redis password (optional)
-#   -n count     Number of items to create (default: 10000)
+#   -h host          Redis host (default: localhost)
+#   -p port          Redis port (default: 6379)
+#   -a password      Redis password (optional)
+#   -n count         Number of items to create (default: 10000)
+#   -b batch_size    Number of items per batch (default: 1000)
 #
 # Arguments:
 #   key-pattern  A pattern for the keys to be created. Use {num} in the pattern to insert a sequence number.
@@ -38,13 +39,14 @@ done
 
 # Function to display usage information
 usage() {
-    echo "Usage: $0 [-h host] [-p port] [-a password] [-n count] <key-pattern>"
+    echo "Usage: $0 [-h host] [-p port] [-a password] [-n count] [-b batch_size] <key-pattern>"
     echo "Options:"
-    echo "  -h host      Redis host (default: localhost)"
-    echo "  -p port      Redis port (default: 6379)"
-    echo "  -a password  Redis password (optional)"
-    echo "  -n count     Number of items to create (default: 10000)"
-    echo "Example: $0 -h redis.example.com -p 6380 -a mypassword -n 5000 'user:{num}'"
+    echo "  -h host          Redis host (default: localhost)"
+    echo "  -p port          Redis port (default: 6379)"
+    echo "  -a password      Redis password (optional)"
+    echo "  -n count         Number of items to create (default: 10000)"
+    echo "  -b batch_size    Number of items per batch (default: 1000)"
+    echo "Example: $0 -h redis.example.com -p 6380 -a mypassword -n 5000 -b 100 'user:{num}'"
     echo "Note: Use {num} in your pattern to be replaced with the sequence number"
     exit 1
 }
@@ -54,8 +56,9 @@ HOST=${REDIS_HOST:-"localhost"}
 PORT=${REDIS_PORT:-6379}
 AUTH=""
 COUNT=10000
+BATCH_SIZE=1000
 
-while getopts "h:p:a:n:" opt; do
+while getopts "h:p:a:n:b:" opt; do
     case ${opt} in
         h)
             HOST=$OPTARG
@@ -68,6 +71,9 @@ while getopts "h:p:a:n:" opt; do
             ;;
         n)
             COUNT=$OPTARG
+            ;;
+        b)
+            BATCH_SIZE=$OPTARG
             ;;
         \?)
             usage
@@ -109,20 +115,28 @@ generate_key() {
     echo "${PATTERN/\{num\}/$num}"
 }
 
-# Function to create values
-create_values() {
-    local CLUSTER=""
-    if is_cluster; then
-        CLUSTER="-c"
-        echo "Creating $COUNT values matching pattern '$PATTERN' in cluster mode..."
-    else
-        echo "Creating $COUNT values matching pattern '$PATTERN' in standalone mode..."
-    fi
-    
+create_standalone() {
+    for ((start=1; start<=$COUNT; start+=BATCH_SIZE)); do
+        end=$((start+BATCH_SIZE-1))
+        if (( end > COUNT )); then
+            end=$COUNT
+        fi
+        echo "Processing batch from $start to $end..."
+        {
+            for ((i=start; i<=end; i++)); do
+                key=$(generate_key "$i")
+                value=$(generate_json "$i")
+                echo "SET $key '$value'"
+            done
+        } | redis-cli -h "$HOST" -p "$PORT" $AUTH --pipe
+    done
+}
+
+create_cluster() {
     for ((i=1; i<=COUNT; i++)); do
         key=$(generate_key "$i")
         value=$(generate_json "$i")
-        redis-cli -h "$HOST" -p "$PORT" $AUTH $CLUSTER SET "$key" "$value"
+        redis-cli -h "$HOST" -p "$PORT" $AUTH -c SET $key \'$value\'
         if [ $((i % 1000)) -eq 0 ]; then
             echo "Created $i values..."
         fi
@@ -133,6 +147,12 @@ create_values() {
 echo "Starting value creation with pattern: $PATTERN"
 echo "Using Redis at $HOST:$PORT"
 
-create_values
+if is_cluster; then
+    echo "Creating $COUNT values matching pattern '$PATTERN' in cluster mode..."
+    create_cluster
+else
+    echo "Creating $COUNT values matching pattern '$PATTERN' in standalone mode..."
+    create_standalone
+fi
 
 echo "Completed value creation operation"
