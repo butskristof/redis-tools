@@ -25,6 +25,17 @@
 # Dependencies:
 #   - redis-cli must be installed and available in the system PATH.
 
+# Tools required for the script
+REQUIRED_TOOLS=("redis-cli")
+
+# Check if all required tools are installed
+for TOOL in "${REQUIRED_TOOLS[@]}"; do
+    if ! command -v "$TOOL" &> /dev/null; then
+        echo "Error: $TOOL is not installed or not available in PATH."
+        exit 1
+    fi
+done
+
 # Function to display usage information
 usage() {
     echo "Usage: $0 [-h host] [-p port] [-a password] <key-pattern>"

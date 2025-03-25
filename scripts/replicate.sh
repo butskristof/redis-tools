@@ -20,6 +20,17 @@
 # Dependencies:
 #   - redis-cli and riot must be installed and available in the system PATH.
 
+# Tools required for the script
+REQUIRED_TOOLS=("redis-cli" "riot")
+
+# Check if all required tools are installed
+for TOOL in "${REQUIRED_TOOLS[@]}"; do
+    if ! command -v "$TOOL" &> /dev/null; then
+        echo "Error: $TOOL is not installed or not available in PATH."
+        exit 1
+    fi
+done
+
 # Function to display usage information
 usage() {
     echo "Usage: $0 [-s source-host] [-p source-port] [-a source-password] [-d dest-host] [-q dest-port] [-b dest-password]"
@@ -73,6 +84,7 @@ if [ -z "$SOURCE_HOST" ] || [ -z "$SOURCE_PORT" ] || [ -z "$DEST_HOST" ] || [ -z
     echo "Error: Missing required parameters."
     usage
 fi
+
 
 # Set authentication variables
 SOURCE_AUTH=""
