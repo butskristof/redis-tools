@@ -61,7 +61,7 @@ while getopts "h:p:a:" opt; do
             PORT=$OPTARG
             ;;
         a)
-            AUTH="-a $OPTARG"
+            AUTH="-a $OPTARG --no-auth-warning"
             ;;
         \?)
             usage
@@ -89,15 +89,19 @@ is_cluster() {
     fi
 }
 
-# Function to delete keys in standalone mode using SCAN
+# Function to delete keys in standalone mode using KEYS
 delete_standalone() {
     echo "Deleting keys matching pattern '$PATTERN' in standalone mode..."
     
-    # Use SCAN to iterate through keys and delete them in batches
-    redis-cli -h "$HOST" -p "$PORT" $AUTH KEYS "$PATTERN" | while read -r key; do
-        redis-cli -h "$HOST" -p "$PORT" $AUTH DEL "$key"
-        echo "Deleted key: $key"
-    done
+    keys=$(redis-cli -h "$HOST" -p "$PORT" $AUTH KEYS "$PATTERN")
+    if [ -n "$keys" ]; then
+        # Build and batch execute DEL commands using --pipe
+        for key in $keys; do
+            printf "DEL %s\r\n" "$key"
+        done | redis-cli -h "$HOST" -p "$PORT" $AUTH --pipe
+    else
+        echo "No keys match pattern '$PATTERN'."
+    fi
 }
 
 # Function to delete keys in cluster mode
@@ -105,23 +109,23 @@ delete_cluster() {
     echo "Deleting keys matching pattern '$PATTERN' in cluster mode..."
     
     # Use cluster nodes to get all master nodes
-    nodes=$(redis-cli -h "$HOST" -p "$PORT" $AUTH cluster nodes | grep "master" | cut -d' ' -f1)
+    primary_nodes=$(redis-cli -h "$HOST" -p "$PORT" $AUTH cluster nodes | grep master | awk '{print $2}' | cut -d@ -f1)
     
     # Iterate through each master node
-    for node in $nodes; do
+    for node in $primary_nodes; do
         echo "Processing node: $node"
         # Get host and port for the node
-        node_info=$(redis-cli -h "$HOST" -p "$PORT" $AUTH cluster nodes | grep "$node")
-        node_host_port=$(echo "$node_info" | grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}:[0-9]\+' | head -1)
-        if [ -n "$node_host_port" ]; then
-            node_host=$(echo "$node_host_port" | cut -d':' -f1)
-            node_port=$(echo "$node_host_port" | cut -d':' -f2)
-            
-            # Use SCAN on each node to find and delete matching keys
-            redis-cli -h "$node_host" -p "$node_port" $AUTH KEYS "$PATTERN" | while read -r key; do
-                redis-cli -h "$node_host" -p "$node_port" $AUTH -c DEL "$key"
-                echo "Deleted key: $key from node $node_host:$node_port"
-            done
+        node_host=$(echo $node | cut -d: -f1)
+        node_port=$(echo $node | cut -d: -f2)
+
+        keys=$(redis-cli -h "$node_host" -p "$node_port" $AUTH KEYS "$PATTERN")
+        if [ -n "$keys" ]; then
+            # Build and batch execute DEL commands using --pipe
+            for key in $keys; do
+                printf "DEL %s\r\n" "$key"
+            done | redis-cli -h "$node_host" -p "$node_port" $AUTH --pipe
+        else
+            echo "No keys match pattern '$PATTERN'."
         fi
     done
 }

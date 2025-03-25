@@ -97,7 +97,7 @@ if [ -n "$DEST_PASSWORD" ]; then
 fi
 
 # Get all primary nodes in the source cluster
-PRIMARY_NODES=$(redis-cli -h "$SOURCE_HOST" -p "$SOURCE_PORT" ${SOURCE_PASSWORD:+-a "$SOURCE_PASSWORD"} cluster nodes | grep master | awk '{print $2}' | cut -d@ -f1)
+PRIMARY_NODES=$(redis-cli -h "$SOURCE_HOST" -p "$SOURCE_PORT" ${SOURCE_PASSWORD:+-a "$SOURCE_PASSWORD" --no-auth-warning} cluster nodes | grep master | awk '{print $2}' | cut -d@ -f1)
 
 # Loop over each primary node and replicate data
 for NODE in $PRIMARY_NODES; do

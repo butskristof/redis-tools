@@ -64,7 +64,7 @@ while getopts "h:p:a:n:" opt; do
             PORT=$OPTARG
             ;;
         a)
-            AUTH="-a $OPTARG"
+            AUTH="-a $OPTARG --no-auth-warning"
             ;;
         n)
             COUNT=$OPTARG
