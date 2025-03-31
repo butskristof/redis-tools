@@ -1,7 +1,7 @@
 services:
   redis:
     image: redis:latest
-    restart: unless_stopped
+    restart: unless-stopped
     command: redis-server --save 60 1 --loglevel warning
     ports:
       - "6379:6379"
